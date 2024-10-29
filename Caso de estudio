@@ -1,0 +1,126 @@
+install.packages('dplyr')
+install.packages('gridExtra')
+install.packages('lmtest')
+install.packages('corrplot')
+install.packages('car')
+
+
+
+#Configuración del dataset
+library(dplyr)
+
+datos <- read.csv(
+  'C:/Users/jhack/Documents/data-diabetes/diabetes_prediction_dataset.csv',
+  header = TRUE
+)
+
+datos$gender <- as.numeric(factor(datos$gender))
+datos$smoking_history <- as.numeric(factor(datos$smoking_history))
+
+datos <- rename(
+  datos,
+  genero = gender,
+  anio = age,
+  hipertension = hypertension,
+  cardiopatia = heart_disease,
+  historial_tabaquismo = smoking_history,
+  imc = bmi,
+  nivel_hba1c = HbA1c_level,
+  nivel_glucosa_sanguinea = blood_glucose_level,
+  diabetes = diabetes
+)
+
+str(datos)
+View(datoes)
+
+#Analizar la relación entre variables
+
+round(cor(x = datos, method = "pearson"), 3)
+
+library(psych)
+multi.hist(x = datos, dcol = c("blue", "red"), dlty = c("dotted", "solid"),
+           main = "")
+
+library(GGally)
+library(ggplot2)
+ggpairs(datos, lower = list(continuous = "smooth"),
+        diag = list(continuous = "barDiag"), axisLabels = "none")
+
+
+modelo <- lm(diabetes ~ genero + anio + hipertension + cardiopatia + historial_tabaquismo +
+               imc + nivel_hba1c + nivel_glucosa_sanguinea, data = datos )
+summary(modelo)
+
+
+step(object = modelo, direction = "both", trace = 1)
+
+modelo <- lm(diabetes ~  anio + historial_tabaquismo + imc + nivel_glucosa_sanguinea, data = datos)
+summary(modelo)
+
+
+step(object = modelo, direction = "both", trace = 1)
+
+
+confint(lm(formula = diabetes ~ anio + historial_tabaquismo + imc + nivel_glucosa_sanguinea, data = datos))
+
+
+library(ggplot2)
+library(gridExtra)
+plot1 <- ggplot(data = datos, aes(anio, modelo$residuals)) +
+  geom_point() + geom_smooth(color = "firebrick") + geom_hline(yintercept = 0) +
+  theme_bw()
+plot2 <- ggplot(data = datos, aes(historial_tabaquismo, modelo$residuals)) +
+  geom_point() + geom_smooth(color = "firebrick") + geom_hline(yintercept = 0) +
+  theme_bw()
+plot3 <- ggplot(data = datos, aes(imc, modelo$residuals)) +
+  geom_point() + geom_smooth(color = "firebrick") + geom_hline(yintercept = 0) +
+  theme_bw()
+plot4 <- ggplot(data = datos, aes(nivel_glucosa_sanguinea, modelo$residuals)) +
+  geom_point() + geom_smooth(color = "firebrick") + geom_hline(yintercept = 0) +
+  theme_bw()
+grid.arrange(plot1, plot2, plot3, plot4)
+
+
+qqnorm(modelo$residuals)
+qqline(modelo$residuals)
+
+shapiro.test(modelo$residuals)
+
+shapiro.test(modelo$residuals[1:5000])  # Prueba en un subconjunto
+
+ggplot(data = datos, aes(modelo$fitted.values, modelo$residuals)) +
+  geom_point() +
+  geom_smooth(color = "firebrick", se = FALSE) +
+  geom_hline(yintercept = 0) +
+  theme_bw()
+
+library(lmtest)
+bptest(modelo)
+
+library(corrplot)
+corrplot(cor(dplyr::select(datos, anio, historial_tabaquismo, imc, nivel_glucosa_sanguinea)),
+         method = "number", tl.col = "black")
+
+library(car)
+vif(modelo)
+
+
+library(car)
+dwt(modelo, alternative = "two.sided")
+
+library(dplyr)
+datos$studentized_residual <- rstudent(modelo)
+ggplot(data = datos, aes(x = predict(modelo), y = abs(studentized_residual))) +
+  geom_hline(yintercept = 3, color = "grey", linetype = "dashed") +
+  # se identifican en rojo observaciones con residuos estandarizados absolutos > 3
+  geom_point(aes(color = ifelse(abs(studentized_residual) > 3, 'red', 'black'))) +
+  scale_color_identity() +
+  labs(title = "Distribución de los residuos studentized",
+       x = "predicción modelo") + 
+  theme_bw() + theme(plot.title = element_text(hjust = 0.5))
+
+which(abs(datos$studentized_residual) > 3)
+
+summary(influence.measures(modelo))
+
+influencePlot(modelo)
